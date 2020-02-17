@@ -52,6 +52,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     //mayber here?
     var gameWon : Bool = false {
       didSet {
+        run(gameWon ? gameWonSound : gameOverSound)
         let gameOver = childNode(withName: GameMessageName) as! SKSpriteNode
         let textureName = gameWon ? "YouWon" : "GameOver"
         let texture = SKTexture(imageNamed: textureName)
@@ -61,6 +62,12 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         gameOver.run(actionSequence)
       }
     }
+    let blipSound = SKAction.playSoundFileNamed("pongblip", waitForCompletion: false)
+    let blipPaddleSound = SKAction.playSoundFileNamed("paddleBlip", waitForCompletion: false)
+    let bambooBreakSound = SKAction.playSoundFileNamed("BambooBreak", waitForCompletion: false)
+    let gameWonSound = SKAction.playSoundFileNamed("game-won", waitForCompletion: false)
+    let gameOverSound = SKAction.playSoundFileNamed("game-over", waitForCompletion: false)
+
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
       switch gameState.currentState {
@@ -141,8 +148,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         paddle.physicsBody!.categoryBitMask = PaddleCategory
         borderBody.categoryBitMask = BorderCategory
         
-//        ball.physicsBody!.contactTestBitMask = BottomCategory
-        ball.physicsBody!.contactTestBitMask = BottomCategory | BlockCategory
+        ball.physicsBody!.contactTestBitMask = BottomCategory | BlockCategory | BorderCategory | PaddleCategory
+
 
         
         //BRICKS
@@ -177,6 +184,18 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         addChild(gameMessage)
             
         gameState.enter(WaitingForTap.self)
+        
+        // 1
+        let trailNode = SKNode()
+        trailNode.zPosition = 1
+        addChild(trailNode)
+        // 2
+        let trail = SKEmitterNode(fileNamed: "BallTrail")!
+        // 3
+        trail.targetNode = trailNode
+        // 4
+        ball.addChild(trail)
+
 
   }
     func didBegin(_ contact: SKPhysicsContact) {
@@ -211,10 +230,21 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
           }
 
         }
+        // 1
+        if firstBody.categoryBitMask == BallCategory && secondBody.categoryBitMask == BorderCategory {
+          run(blipSound)
+        }
+              
+        // 2
+        if firstBody.categoryBitMask == BallCategory && secondBody.categoryBitMask == PaddleCategory {
+          run(blipPaddleSound)
+        }
 
     }
     
     func breakBlock(node: SKNode) {
+        run(bambooBreakSound)
+
       let particles = SKEmitterNode(fileNamed: "BrokenPlatform")!
       particles.position = node.position
       particles.zPosition = 3
@@ -240,6 +270,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         numberOfBricks = numberOfBricks + 1
       }
       return numberOfBricks == 0
+        
     }
 
   
