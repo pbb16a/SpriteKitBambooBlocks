@@ -24,6 +24,8 @@
  */ 
 
 import SpriteKit
+import GameplayKit
+
 
 let BallCategoryName = "ball"
 let PaddleCategoryName = "paddle"
@@ -42,17 +44,50 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     var isFingerOnPaddle = false
     
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-      let touch = touches.first
-      let touchLocation = touch!.location(in: self)
-
-      if let body = physicsWorld.body(at: touchLocation) {
-        if body.node!.name == PaddleCategoryName {
-          print("Began touch on paddle")
-          isFingerOnPaddle = true
-        }
+    lazy var gameState: GKStateMachine = GKStateMachine(states: [
+    WaitingForTap(scene: self),
+    Playing(scene: self),
+    GameOver(scene: self)])
+    
+    //mayber here?
+    var gameWon : Bool = false {
+      didSet {
+        let gameOver = childNode(withName: GameMessageName) as! SKSpriteNode
+        let textureName = gameWon ? "YouWon" : "GameOver"
+        let texture = SKTexture(imageNamed: textureName)
+        let actionSequence = SKAction.sequence([SKAction.setTexture(texture),
+          SKAction.scale(to: 1.0, duration: 0.25)])
+          
+        gameOver.run(actionSequence)
       }
     }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+      switch gameState.currentState {
+      case is WaitingForTap:
+        gameState.enter(Playing.self)
+        isFingerOnPaddle = true
+          
+      case is Playing:
+        let touch = touches.first
+        let touchLocation = touch!.location(in: self)
+          
+        if let body = physicsWorld.body(at: touchLocation) {
+          if body.node!.name == PaddleCategoryName {
+            isFingerOnPaddle = true
+          }
+        }
+          case is GameOver:
+          let newScene = GameScene(fileNamed:"GameScene")
+          newScene!.scaleMode = .aspectFit
+          let reveal = SKTransition.flipHorizontal(withDuration: 0.5)
+          self.view?.presentScene(newScene!, transition: reveal)
+
+      default:
+        break
+      }
+    }
+
     
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
       // 1
@@ -92,7 +127,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
             
         let ball = childNode(withName: BallCategoryName) as! SKSpriteNode
-        ball.physicsBody!.applyImpulse(CGVector(dx: 2.0, dy: -2.0))
+//        ball.physicsBody!.applyImpulse(CGVector(dx: 2.0, dy: -2.0))
         
         let bottomRect = CGRect(x: frame.origin.x, y: frame.origin.y, width: frame.size.width, height: 1)
         let bottom = SKNode()
@@ -133,8 +168,23 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
           block.zPosition = 2
           addChild(block)
         }
+        
+        let gameMessage = SKSpriteNode(imageNamed: "TapToPlay")
+        gameMessage.name = GameMessageName
+        gameMessage.position = CGPoint(x: frame.midX, y: frame.midY)
+        gameMessage.zPosition = 4
+        gameMessage.setScale(0.0)
+        addChild(gameMessage)
+            
+        gameState.enter(WaitingForTap.self)
+
   }
     func didBegin(_ contact: SKPhysicsContact) {
+        
+        if gameState.currentState is Playing {
+        // Previous code remains here...
+        } // Don't forget to close the 'if' statement at the end of the method.
+
       // 1
       var firstBody: SKPhysicsBody
       var secondBody: SKPhysicsBody
@@ -148,12 +198,18 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
       }
       // 3
       if firstBody.categoryBitMask == BallCategory && secondBody.categoryBitMask == BottomCategory {
-        print("Hit bottom. First contact has been made.")
+       gameState.enter(GameOver.self)
+        gameWon = false
+
       }
         
         if firstBody.categoryBitMask == BallCategory && secondBody.categoryBitMask == BlockCategory {
           breakBlock(node: secondBody.node!)
-          //TODO: check if the game has been won
+          if isGameWon() {
+            gameState.enter(GameOver.self)
+            gameWon = true
+          }
+
         }
 
     }
@@ -168,8 +224,24 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
       node.removeFromParent()
     }
 
+    func randomFloat(from: CGFloat, to: CGFloat) -> CGFloat {
+      let rand: CGFloat = CGFloat(Float(arc4random()) / 0xFFFFFFFF)
+      return (rand) * (to - from) + from
+    }
 
+    override func update(_ currentTime: TimeInterval) {
+      gameState.update(deltaTime: currentTime)
+    }
     
+    func isGameWon() -> Bool {
+      var numberOfBricks = 0
+      self.enumerateChildNodes(withName: BlockCategoryName) {
+        node, stop in
+        numberOfBricks = numberOfBricks + 1
+      }
+      return numberOfBricks == 0
+    }
+
   
   
 }
