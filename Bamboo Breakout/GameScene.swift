@@ -37,7 +37,7 @@ let PaddleCategory : UInt32 = 0x1 << 3
 let BorderCategory : UInt32 = 0x1 << 4
 
 
-// 4
+
 class GameScene: SKScene, SKPhysicsContactDelegate {
     
     var isFingerOnPaddle = false
@@ -88,33 +88,51 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         physicsWorld.gravity = CGVector(dx: 0.0, dy: 0.0)
         
-        //5
         physicsWorld.contactDelegate = self
 
-
+            
         let ball = childNode(withName: BallCategoryName) as! SKSpriteNode
         ball.physicsBody!.applyImpulse(CGVector(dx: 2.0, dy: -2.0))
-
-        //1
+        
         let bottomRect = CGRect(x: frame.origin.x, y: frame.origin.y, width: frame.size.width, height: 1)
         let bottom = SKNode()
         bottom.physicsBody = SKPhysicsBody(edgeLoopFrom: bottomRect)
         addChild(bottom)
-
-        //2
+        
         let paddle = childNode(withName: PaddleCategoryName) as! SKSpriteNode
-
+            
         bottom.physicsBody!.categoryBitMask = BottomCategory
         ball.physicsBody!.categoryBitMask = BallCategory
         paddle.physicsBody!.categoryBitMask = PaddleCategory
         borderBody.categoryBitMask = BorderCategory
+        
+//        ball.physicsBody!.contactTestBitMask = BottomCategory
+        ball.physicsBody!.contactTestBitMask = BottomCategory | BlockCategory
 
+        
+        //BRICKS
+        // 1
+        let numberOfBlocks = 8
+        let blockWidth = SKSpriteNode(imageNamed: "block").size.width
+        let totalBlocksWidth = blockWidth * CGFloat(numberOfBlocks)
+        // 2
+        let xOffset = (frame.width - totalBlocksWidth) / 2
         // 3
-        ball.physicsBody!.contactTestBitMask = BottomCategory
+        for i in 0..<numberOfBlocks {
+          let block = SKSpriteNode(imageNamed: "block.png")
+          block.position = CGPoint(x: xOffset + CGFloat(CGFloat(i) + 0.5) * blockWidth,
+            y: frame.height * 0.8)
 
-
-
-    
+          block.physicsBody = SKPhysicsBody(rectangleOf: block.frame.size)
+          block.physicsBody!.allowsRotation = false
+          block.physicsBody!.friction = 0.0
+          block.physicsBody!.affectedByGravity = false
+          block.physicsBody!.isDynamic = false
+          block.name = BlockCategoryName
+          block.physicsBody!.categoryBitMask = BlockCategory
+          block.zPosition = 2
+          addChild(block)
+        }
   }
     func didBegin(_ contact: SKPhysicsContact) {
       // 1
@@ -132,7 +150,24 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
       if firstBody.categoryBitMask == BallCategory && secondBody.categoryBitMask == BottomCategory {
         print("Hit bottom. First contact has been made.")
       }
+        
+        if firstBody.categoryBitMask == BallCategory && secondBody.categoryBitMask == BlockCategory {
+          breakBlock(node: secondBody.node!)
+          //TODO: check if the game has been won
+        }
+
     }
+    
+    func breakBlock(node: SKNode) {
+      let particles = SKEmitterNode(fileNamed: "BrokenPlatform")!
+      particles.position = node.position
+      particles.zPosition = 3
+      addChild(particles)
+      particles.run(SKAction.sequence([SKAction.wait(forDuration: 1.0),
+        SKAction.removeFromParent()]))
+      node.removeFromParent()
+    }
+
 
     
   
